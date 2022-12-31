@@ -1,0 +1,222 @@
+# Keep in mind this is a copy from the code in my AWS directory, meaning it will not work if used in different locations.
+
+import requests
+import json
+import time
+import csv
+import os
+
+#Defining Keys and tickers
+tickers = ['AAPL', 'ACN', 'ADBE', 'AMD', 'CSCO', 'INTC', 'MSFT', 'ORCL', 'QCOM', 'TSM']
+
+key1 = 'Time Series (Daily)'
+key3 = '5. adjusted close'
+
+# Creating new Files
+
+# for ticker in tickers:
+#     print('Creating '+ticker+' file')
+#     # General Website Request
+#     url = 'http://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol='+ticker+'&outputsize=full&apikey=NG9C9EPVYBMQT0C8'
+#     request = requests.get(url)
+#     time.sleep(12)
+#     # Dump into dictionary
+#     rqst_dict = json.loads(request.text)
+#     json.dump(rqst_dict, open(ticker+".csv", "w"))
+#     # Creating new CSV
+#     csv_fil = open('/home/ubuntu/environment/data3500/Final Project/Prices/'+ticker+'.csv','w')
+#     lst = []
+#     # Extracting price data
+#     for date in rqst_dict[key1]:
+#         lst.append(date+','+(rqst_dict[key1][date][key3])+'\n')
+#     lst.reverse()
+#     # Dumping data in CSV
+#     for i in lst:
+#         csv_fil.write(i)
+#     csv_fil.close()
+
+def read(ticker):
+    with open ('/home/ubuntu/environment/data3500/Final Project/Prices/'+ticker+".csv", 'r') as a:
+        lst = []
+        for line in csv.reader(a):
+            lst.append(line)
+    return(lst)
+
+def lst_date(ticker):
+    lst = read(ticker)
+    return(lst[len(lst)-1][0])
+
+def update(ticker):
+    lst = []
+    url = 'http://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol='+ticker+'&outputsize=full&apikey=NG9C9EPVYBMQT0C8'
+    request = requests.get(url)
+    time.sleep(12)
+    rqst_dict = json.loads(request.text)
+    for date in rqst_dict[key1]:
+        if date > lst_date(ticker):
+            lst.append(date+','+(rqst_dict[key1][date][key3])+'\n')
+    lst.reverse()
+    csv_fil = open('/home/ubuntu/environment/data3500/Final Project/Prices/'+ticker+".csv", 'a')
+    for l in (lst):
+        csv_fil.write(l)
+    csv_fil.close()
+    return(ticker+' data, has been update with the following info:', lst)
+
+# Mean Reversion includes shorting
+def MeanReversion(lst):
+    buy = 0
+    sell = 0
+    shortsell = 0
+    shortbuy = 0
+    sell_p = []
+    buy_p = []
+    shortsellp = []
+    shortbuyp = []
+    count = 0
+    Earnings = []
+    print('Mean Reversion\n')
+    for i in range(0,len(lst)-5):
+        if count == 0 and (lst[i+5]) < 0.98*(sum(lst[0+i:5+i])/5):
+            buy = lst[i+5]
+            print("buy at:", buy)
+            buy_p.append(buy)
+            count += 1
+        elif count == 0 and (lst[i+5]) > 1.02*(sum(lst[0+i:5+i])/5):
+            shortsell = lst[i+5]
+            print("short at at:", shortsell)
+            shortsellp.append(shortsell)
+            count +=2
+        if count == 1 and (lst[i+5]) > 1.02*(sum(lst[0+i:5+i])/5):
+            sell = lst[i+5]
+            print("sell at:", sell)
+            sell_p.append(sell)
+            Earnings.append(round(sell-buy,2))
+            print('Earnings:', Earnings[len(Earnings)-1])
+            count -= 1
+        if count == 2 and (lst[i+5]) < 0.98*(sum(lst[0+i:5+i])/5):
+            shortbuy = lst[i+5]
+            print("Buy short at:", shortbuy)
+            shortbuyp.append(shortbuy)
+            Earnings.append(shortsell-shortbuy)
+            print('Shorting Earnings =', (shortsell-shortbuy))
+            count -= 2
+    print('Total Earnings:', sum(Earnings))
+    TotEar = sum(Earnings)
+    print('First buy:', buy_p[0])
+    Fbuy = buy_p[0]
+    print('Percentage return:', str(round((sum(Earnings)/buy_p[0])*100,2))+ '%')
+    Preturn = round((sum(Earnings)/buy_p[0])*100,2)
+    if count == 0 and (lst[len(lst)-1]) > 1.02*((sum(lst[-6:])-lst[len(lst)-1])/5):
+        print('Buy now!')
+    if count == 1 and (lst[len(lst)-1]) < 0.98*((sum(lst[-6:])-lst[len(lst)-1])/5):
+        print('Sell now!')
+    return(TotEar, Fbuy, Preturn)
+    
+def SimpAverage(lst):
+    buy = 0
+    sell = 0
+    sell_p = []
+    buy_p = []
+    count = 0
+    Earnings = []
+    print('Simple Average\n')
+    for i in range(0,len(lst)-5):
+        if count == 0 and (lst[i+5]) < (sum(lst[i+0:i+5])/5):
+            buy = lst[i+5]
+            print("buy at:", buy)
+            buy_p.append(buy)
+            count += 1
+        if count == 1 and (lst[i+5]) > (sum(lst[0+i:5+i])/5):
+            sell = lst[i+5]
+            print("sell at:", sell)
+            sell_p.append(sell)
+            Earnings.append(round(sell-buy,2))
+            print('Earnings:', Earnings[len(Earnings)-1])
+            count -= 1
+    print('Total Earnings:', sum(Earnings))
+    TotEar = sum(Earnings)
+    print('First buy:', buy_p[0])
+    Fbuy = buy_p[0]
+    print('Percentage return:', str(round((sum(Earnings)/buy_p[0])*100,2)) + '%')
+    Preturn = round((sum(Earnings)/buy_p[0])*100,2)
+    if count == 0 and (lst[len(lst)-1]) < ((sum(lst[-6:])-lst[len(lst)-1])/5):
+        print('Buy now!')
+    if count == 1 and (lst[len(lst)-1]) > ((sum(lst[-6:])-lst[len(lst)-1])/5):
+        print('Sell now!')
+    return(TotEar, Fbuy, Preturn)
+    
+# Sillies strat ever, just buy one day and sell the other
+def NewStrat(lst):
+    buy = 0
+    sell = 0
+    sell_p = []
+    buy_p = []
+    count = 0
+    Earnings = []
+    print('Simple Average\n')
+    for i in range(0,len(lst)-5):
+        if count == 1:
+            sell = lst[i+5]
+            print("sell at:", sell)
+            sell_p.append(sell)
+            Earnings.append(round(sell-buy,2))
+            print('Earnings:', Earnings[len(Earnings)-1])
+            count -= 1
+        else:
+            buy = lst[i+5]
+            print("buy at:", buy)
+            buy_p.append(buy)
+            count += 1
+    print('Total Earnings:', sum(Earnings))
+    TotEar = sum(Earnings)
+    print('First buy:', buy_p[0])
+    Fbuy = buy_p[0]
+    print('Percentage return:', str(round((sum(Earnings)/buy_p[0])*100,2)) + '%')
+    Preturn = round((sum(Earnings)/buy_p[0])*100,2)
+    if count == 1:
+        print('Sell now!')
+    if count == 0:
+        print('Buy now!')
+    return(TotEar, Fbuy, Preturn)
+
+def Jsondict(dicti):
+    json.dump(dicti, open("/home/ubuntu/environment/data3500/Final Project/results.json", "w"), indent = 5)
+
+# Function calls / output
+dictionary = {}
+maxEarnings = 0
+maxPreturns = 0
+for ticker in tickers:
+    print(ticker, '\n')
+    # Updating CSV Files
+    print(update(ticker))
+    # Strategies
+    lst = []
+    for i in read(ticker):
+        lst.append(float(i[1]))
+    print('\n')
+    MR = MeanReversion(lst)
+    SA = SimpAverage(lst)
+    NS = NewStrat(lst)
+    print('\n')
+    dictionary[ticker +' ' + 'EarningsMR'] = MR[0]
+    dictionary[ticker +' ' + 'EarningsSA'] = SA[0]
+    dictionary[ticker +' ' + 'EarningsNS'] = NS[0]
+    dictionary[ticker +' ' + 'PreturnsMR'] = MR[2]
+    dictionary[ticker +' ' + 'PreturnsSA'] = SA[2]
+    dictionary[ticker +' ' + 'PreturnsNS'] = NS[2]
+    Earnings = [MR[0], SA[0], NS[0]]
+    Preturns = [MR[2], SA[2], NS[2]]
+    if max(Earnings) > maxEarnings:
+        maxEarnings = max(Earnings)
+    if max(Preturns) > maxPreturns:
+        maxPreturns = max(Preturns)
+
+Jsondict(dictionary)
+
+for a, v in dictionary.items():
+    if v == maxEarnings:
+        print('\n','Highest Total Earnings:', v, '\n', 'Best Stock, Strategy:', a)
+        print('Trading Strategies:', '\n', 'MR = Mean Reversion', '\n', 'SA = Simple Average', '\n', 'NS = New Strategy(Day Trades)')
+
+input('Press Enter')
