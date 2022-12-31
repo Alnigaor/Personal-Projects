@@ -1,0 +1,179 @@
+---
+title: "Final Presentation"
+author: "Steffen Rigby, Kendra DeLange, Joshua Baugh, Alvaro Garcia"
+date: "`r Sys.Date()`"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(car)
+library(effects)
+library(dplyr)
+library(readr)
+library(stargazer)
+library(lmtest)
+library(corrgram)
+library(MASS)
+library(skimr)
+library(readr)
+Log_hous <- read_csv("C:\\Users\\Alvaro Garcia\\Documents\\Logan_housing.csv")
+Log_hous$month_sold<-factor(Log_hous$month_sold)
+Log_hous$Quadrant<-factor(Log_hous$Quadrant)
+Log_hous$School_District<-factor(Log_hous$School_District)
+```
+
+\newpage
+
+# Introduction 
+
+Our project's goal is to examine the effects that determine how many days a house is on the Logan market. We hypothesize that the size and location of the house will influence the decision of potential buyers; namely, houses with certain qualities will sell more quickly. That being said, we will use the data to estimate these effects. For example, what are the primary causes that determine how long a house is on the market in Logan? How do houses located in the Logan School District fare on the market compared to houses in the Cache School District? These questions are relevant and important because almost everyone at one point will participate in the housing market. These questions are especially important to those selling homes in Logan.
+
+In summary, our formal research question is: What are the primary factors that determine how long a house is on the market in Logan, Utah? 
+
+# Data 
+
+For this project, we used a data set that was complied on UtahRealEstate.com. Data includes variables from the Logan, Utah housing market in 2019. However, we have no further information regarding the collection of the data.
+
+Our data set contained 4110 observations on 9 variables. We used all 9 variables, namely: DOM (days on the market: how long a house was up for sale); Sold_Price (the final price that the house sold for, measured in dollars); Garage_Capacity (how many cars could fit within the garage); Quadrant (the sector of Logan in which the house is located); School_District (whether the house belonged in the Cache or Logan School District); Total_Bathrooms (total number of bathrooms); Total_Bedrooms (total number of bedrooms); Total_SQ (the total square feet of the house, measured in feet); and month_sold (the month in which the house sold, measured numerically between 1 and 12). Additionally, as we tested various regression models we used the log of DOM and the squares of Total_SQ and Garage_Capacity. We also tested the interaction terms between Sold_Price and School_District, as well as, Total_Bedrooms and School_District.
+
+For our regression models we used DOM as the dependent variable, with the other 8 variables as independent.
+
+The following table shows summary statistics for the variables. Some of the interesting observations include:
+
+```{r}
+skim(Log_hous)
+```
+
+The mean Sold_Price was $282,125, which seems very low in our opinion. That being said, this data set was complied in 2019. This was before the COVID 19 pandemic, which significantly increased housing prices due to material shortages.
+
+The mean for month_sold is 6.678. That suggests that the mean month in which these houses sold in 2019 was during the middle of June and even the surrounding months. This average makes sense as weather in Logan during the winter is more difficult to move in. Winter months are also holiday season and times when children would be in school. Therefor, high demand for buying homes in the summer months makes sense.
+
+The max for total bedrooms was 9. That number suggests that this data set contains some very large houses. This is surprising to us, considering the location of Logan. It is not set up against the mountains like Providence or River Heights, in which there are many large houses overlooking Cache Valley.
+Furthermore, the max for total square feet was 10890. Upon doing the conversions, that means that the largest house in this data set was 0.25 acres large. That is also surprising, since according to the 2020 census the median household income in Logan, Utah is $43056.
+
+Below we have a correlation diagram. This diagram includes all of the variables that we used in our analysis. From this diagram we were hoping to find that DOM was more highly correlated with the dependent variables. However, there is fairly low correlation observed. We can aslo see that there are some highly correlated variables in which we needed to check VIF for.
+
+```{r}
+corrgram(Log_hous)
+```
+
+# Base Model
+
+Model Composed of all variables in our sample.
+
+$DOM = \beta_0 + \beta_1SoldPrice +\beta_2GarageCapacity +\beta_3Quadrant +\beta_4SchoolDistrict +\beta_5TotalBedrooms +\beta_6TotalBathrooms + \beta_7TotalSqFt+\beta_8MonthSold$
+
+```{r}
+MRM<-lm(DOM~I(Sold_Price/10000)+Garage_Capacity+Quadrant+School_District+Total_Bedrooms+Total_Bathrooms+I(Total_SQ/100)+month_sold, Log_hous)
+```
+
+# Empirical Framework
+
+In order for us to keep using the Ordinary Least Squares (OLS) technique, we need to prove that our Data satisfies the Classical Linear Model Assumptions. 
+
+MLR.1 Linear Parameters: Assumption met by our base model.
+
+MLR.2 Random Sampling: We have no information regarding how our data was gathered or sampled, but assume that the dataset is randomly sampled as it comes from a trusted source, and has a relatively big size. However there are likely some limitations to the quality of the data, provided it's mostly transactional data gathered by a seller. 
+
+MLR.3 No Perfect Colinearity: According to our correlation chart, there are some variables that are highly correlated but no variables exhibit perfect collinearity. 
+
+```{r}
+vif(MRM)
+```
+
+As noted above, there is no need for concern of multicollinearity as the vif never surpasses 10.
+
+MLR.4 Zero Conditional mean: There should be nothing in the error term that is correlated with both the explanatory and our independent variables. Satisfying this assumption can be challenging and its violation is normally caused by omiting significant variables in the model. We include most of the variables in our sample, however, there could still be other variables we don't know of -external to the sample- causing some bias in our results.
+
+MLR.5 Homoscedasticity: This assumption dictates that the variance across all the Xs in the model should be relatively constant.
+
+We ran a Breusch-Pagan hypotheis test, with $H_0=Homoskedastic$ to see if we are able to fail to reject the null. 
+
+```{r}
+bptest(MRM)
+```
+
+As seen above, the p-value is too small, meaning we reject the null. In the empirical framework below we will explore various methods of solving this issue.
+
+MLR.6 Normality: Checking for this assumption is unecessary due to the fact that we have such a large sample size -central limit theorem-.
+
+Not all OLS assumptions were met, meaning our base model is not BLUE -Best Linear Unbiased Estimator-. In the next section of this report we'll show the different measures used to correct them and achieve a significant final model.
+
+# Tested Models
+
+## Log-Level
+
+$log(DOM)=\beta_0 +𝛽_1Sold_Price+ 𝛽_2GarageCapacity+𝛽_3 Quadrant+ 𝛽_4SchoolDistrict+ 𝛽_5TotalBedrooms+ 𝛽_6TotalBathrooms+ 𝛽_7TotalSQ+ 𝛽_8monthSold + u$
+
+We tried to use a log-level to correct the heteroskedasticity in our initial model, however that didn't help. The results of a bp-test showed that our variance was even more homoskedastic than before.
+
+## Garage Capacity Squared
+
+$DOM=𝛽_0 +𝛽_1SoldPrice+ 𝛽_2GarageCapacity+ 𝛽_3 Quadrant+ 𝛽_4SchoolDistrict+ 𝛽_5TotalBedrooms+𝛽_6TotalBathrooms+ 𝛽_7TotalSQ+ 𝛽_8Month_Sold +𝛽_9GarageCapacity^2 +u $
+
+This model increased the significance of Garage Capacity and showed us that the variable has a diminishing effect over days on the market.
+
+## SoldPrice:School District
+
+$DOM =𝛽_0+𝛽_1SoldPrice+ 𝛽_2GarageCapacity+ 𝛽_3Quadrant+ 𝛽_4SchoolDistrict+ 𝛽_5TotalBedrooms+ 𝛽_6TotalBathrooms+ 𝛽_7TotalSQ+ 𝛽_8monthsold + 𝛽_9GarageCapacity^2  + 𝛽_10SoldPrice:SchoolDistrict +  u$
+
+The interaction added in the model above decreased the significance of other variables and the $R^2$ of our model. We decided to keep it out of the model.
+
+## Sold Price Squared + Total SQ Feet Squared
+
+$DOM=𝛽_0  + 𝛽_1SoldPrice+ 𝛽_2SoldPrice^2+ 𝛽_3GarageCapacity+ 𝛽_4GarageCapacity^2+ 𝛽_5Quadrant+ 𝛽_6SchoolDistrict+ 𝛽_7TotalBedrooms+ 𝛽_8TotalBathrooms+ 𝛽_9TotalSQ+ 𝛽10TotalSQ^2+ 𝛽_11monthsold +  u$
+
+This interaction increased the significance of the Total Squared feet in our model, corroborating the idea that this variable has a diminishing marginal effect on DOM. However, the significance of other variables decreased so much that we decided to keep this variable out of the model. This is likely due to multicolinearity between the interaction and other predictors.
+
+We also added Sold Price squared to the model, and decided to keep it as it increased the significance of Sold Price without influencing other variables in our model.
+
+# Results
+
+Testing the models described above eventually leads to the conclusion that the model with the best fit for the equation, as measured by adjusted R2, is:
+
+$DOM = \beta_0 + \beta_1SoldPrice + 𝛽_2(SoldPrice)2 + 𝛽_3GarageCapacity + 𝛽_4(GarageCapacity)2+ 𝛽_5Quadrant+ 𝛽_6SchoolDistrict + 𝛽_7TotalBedrooms:SchoolDistrict + 𝛽_8TotalBedrooms + 𝛽_9TotalBathrooms + 𝛽_10TotalSQ + 𝛽_11monthsold + u$
+
+The results for this model are reported below.
+
+```{r}
+MRM_quad_int<-lm(DOM~I(Sold_Price/10000)+I((Sold_Price/10000)^2)+Garage_Capacity+I(Garage_Capacity^2)+Quadrant+School_District+Total_Bedrooms:School_District+Total_Bedrooms+Total_Bathrooms+I(Total_SQ/100)+month_sold, Log_hous)
+
+robust_se_quad<-coeftest(MRM_quad_int, vcov= hccm(MRM_quad_int, type="hc0"))[,2]
+
+stargazer(MRM_quad_int,type = "text", se=list(robust_se_quad))
+```
+
+This model has the highest adjusted R2 of any of our models: 0.12. So, the model can only account for 12 percent of the differences in wages among different people. This must mean that there are further variables that we do not have access to or data about that might contribute to a greater explanation of our dependent variable.
+
+Except for QuadrantSW, QuadrantSE, and month_sold2,3,12, all of our variables are significant at the 5% level. 
+
+As this is a level-level model, all changes in wage are measure in direct units. Please note that we changed the units for Sold_Price and Total_SQ to tens of thousands of dollars and hundreds of square feet respectively; this made it easier to explain the partial effects of these factors on our dependent variable. 
+
+Answering the original question, houses located in the Logan School District sell 20 days quicker than those located in Cache, as indicated by the estimated coefficient $\beta_6$. 
+
+# Conclusion
+
+Following are the interpretations of our most statistically significant variables:
+
+\ Price: An increase of $10,000 decreases the DOM by 0.994; Diminishing marginal effect 
+
+\ Garage Capacity: The capacity to hold an extra car  increases the DOM by 4.67; diminishing marginal effect
+
+\ nLogan School District: Houses in the Logan school are on the market almost 20 days less than houses in Cache
+
+\ Total Bedrooms: An extra bedroom will decrease the average days in the market by about 6 days
+
+\ Total Bathrooms: An extra Bathroom will increase the days in the market of the house by about 3 days on average.
+
+\ Total Square Feet: An extra 100 Square feet on a house will increase the house’s DOM by about 1.7 days on average.
+
+The results of our regression show that it if attempting to sell a house as quickly as possible, it is preferable to build a house in the Logan School District and to sell in the summer months. As mentioned in the class the results of our model are relatively standard, and support pre-existing notions about possible variable interactions within the housing market.
+
+For future reference, It's important to recognize that OLS is a relatively limited technology, as it only works whenever a linear representation of the data can be achieved, and does not recognize other patterns. It would be beneficial for those interested in further exploring this data to use different techniques that make up for this constraint.
+
+
+
+
